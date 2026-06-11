@@ -100,9 +100,8 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
         chooserOverlay.innerHTML = [
           '<div style="width:min(100%,420px);background:#0f172a;color:#fff;border:1px solid rgba(148,163,184,.18);border-radius:18px;padding:18px 16px 14px;box-shadow:0 24px 64px rgba(0,0,0,.45)">',
           '<div id="iphone-episode-title" style="font:700 16px/1.35 -apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;margin:0 0 14px;word-break:break-word"></div>',
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">',
-          '<button type="button" data-action="watch" style="appearance:none;border:none;border-radius:14px;padding:14px 12px;background:#eab308;color:#111827;font:700 15px/1.2 -apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">Ver</button>',
-          '<button type="button" data-action="download" style="appearance:none;border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:14px 12px;background:rgba(255,255,255,.08);color:#fff;font:700 15px/1.2 -apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">Descargar</button>',
+          '<div style="display:grid;grid-template-columns:1fr;gap:10px">',
+          '<button type="button" data-action="download" style="appearance:none;border:none;border-radius:14px;padding:15px 12px;background:#22c55e;color:#052e16;font:800 15px/1.2 -apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">Descargar episodio</button>',
           '</div>',
           '<button type="button" data-action="cancel" style="appearance:none;border:none;background:transparent;color:#94a3b8;font:600 14px/1.2 -apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;width:100%;padding:14px 10px 2px;margin-top:6px">Cancelar</button>',
           '</div>'
@@ -233,11 +232,10 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
         }
 
         function openEpisode(card) {
-          if (!card) return;
-          hideChooser();
-          if (isAppleMobile() && showInlinePlayer(card)) return;
-          allowNextCardOpen = true;
-          card.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+          const anchor = card && card.querySelector('a[title="Descargar episodio"]');
+          if (anchor) {
+            downloadToFiles(anchor);
+          }
         }
 
         function setButtonState(anchor, label, busy) {
@@ -309,14 +307,7 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
               if (event.stopImmediatePropagation) {
                 event.stopImmediatePropagation();
               }
-              if (isAppleMobile()) {
-                downloadToFiles(anchor);
-              } else {
-                const href = anchor.getAttribute("href");
-                if (href) {
-                  window.location.href = href;
-                }
-              }
+              downloadToFiles(anchor);
             }, true);
           });
         }
@@ -328,12 +319,9 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
             if (card.dataset.iosCardPatched === "1") return;
             if (!card.querySelector('a[title="Descargar episodio"]')) return;
             card.dataset.iosCardPatched = "1";
+            card.setAttribute("role", "button");
+            card.setAttribute("aria-label", "Descargar " + getEpisodeTitle(card));
             card.addEventListener("click", function (event) {
-              if (!isAppleMobile()) return;
-              if (allowNextCardOpen) {
-                allowNextCardOpen = false;
-                return;
-              }
               if (event.target.closest('a[title="Descargar episodio"]')) return;
               if (event.target.closest("button")) return;
               event.preventDefault();
@@ -341,7 +329,13 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
               if (event.stopImmediatePropagation) {
                 event.stopImmediatePropagation();
               }
-              showChooser(card);
+              activeCard = card;
+              activeDownloadAnchor = card.querySelector('a[title="Descargar episodio"]');
+              if (isAppleMobile()) {
+                showChooser(card);
+              } else if (activeDownloadAnchor) {
+                downloadToFiles(activeDownloadAnchor);
+              }
             }, true);
           });
         }
@@ -353,6 +347,7 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
                 patchDownloadButtons(node);
                 patchEpisodeCards(node);
                 patchInlineVideos(node);
+                applyDownloadCenterCopy();
               }
             });
           });
@@ -376,10 +371,6 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
             hideChooser();
             return;
           }
-          if (action === "watch") {
-            openEpisode(activeCard);
-            return;
-          }
           if (action === "download") {
             const anchor = activeDownloadAnchor;
             hideChooser();
@@ -389,10 +380,21 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
           }
         });
 
+        function applyDownloadCenterCopy() {
+          document.title = "WWE Download Center";
+          const headings = Array.from(document.querySelectorAll("h1,h2,p,span,button"));
+          headings.forEach(function (el) {
+            const text = (el.textContent || "").trim();
+            if (text === "WWE Archive Viewer") el.textContent = "WWE Download Center";
+            if (text === "Watch Now" || text === "Ver" || text === "Reproducir") el.textContent = "Descargar";
+          });
+        }
+
         document.addEventListener("DOMContentLoaded", function () {
           patchDownloadButtons(document);
           patchEpisodeCards(document);
           patchInlineVideos(document);
+          applyDownloadCenterCopy();
           observer.observe(document.body, { childList: true, subtree: true });
         });
       })();
