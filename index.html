@@ -164,6 +164,44 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
           return title ? title.textContent.trim() : "Episodio";
         }
 
+        function sanitizeFilenamePart(value) {
+          return String(value || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-zA-Z0-9._-]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .slice(0, 80);
+        }
+
+        function extensionFromUrl(url) {
+          const clean = String(url || "").split("?")[0].split("#")[0];
+          const match = clean.match(/\.([a-z0-9]{2,5})$/i);
+          return match ? "." + match[1].toLowerCase() : ".mp4";
+        }
+
+        function isoDateFromEpisodeTitle(title) {
+          const months = {
+            january: "01", february: "02", march: "03", april: "04",
+            may: "05", june: "06", july: "07", august: "08",
+            september: "09", october: "10", november: "11", december: "12"
+          };
+          const match = String(title || "").match(/([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})/);
+          if (!match) return "";
+          const month = months[match[1].toLowerCase()];
+          if (!month) return "";
+          return match[3] + "-" + month + "-" + String(match[2]).padStart(2, "0");
+        }
+
+        function getEpisodeFilename(anchor) {
+          const card = findEpisodeCard(anchor);
+          const title = getEpisodeTitle(card);
+          const url = getStoredDownloadUrl(anchor);
+          const date = isoDateFromEpisodeTitle(title) || "episodio";
+          const showMatch = title.match(/^(.+?)\s+[–-]\s+/);
+          const show = sanitizeFilenamePart(showMatch ? showMatch[1] : "WWE");
+          return sanitizeFilenamePart(date + (show ? "_" + show : "")) + extensionFromUrl(url);
+        }
+
         function hideChooser() {
           chooserOverlay.style.display = "none";
           activeCard = null;
@@ -197,6 +235,10 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
           anchor.setAttribute("target", "_self");
           anchor.setAttribute("rel", "noopener noreferrer");
           anchor.setAttribute("role", "button");
+          const filename = getEpisodeFilename(anchor);
+          anchor.setAttribute("download", filename);
+          anchor.dataset.downloadFilename = filename;
+          anchor.setAttribute("data-download-filename", filename);
           anchor.dataset.iosDownloadLocked = "1";
         }
 
@@ -298,16 +340,17 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
         async function openIosShortcutDownload(anchor) {
           lockDownloadAnchor(anchor);
           const url = getStoredDownloadUrl(anchor);
+          const filename = anchor.dataset.downloadFilename || getEpisodeFilename(anchor);
           if (!url) return;
-          await copyDownloadLink(url);
-          showToast("Abriendo Atajos. Usa el atajo: " + IOS_SHORTCUT_NAME + ".");
+          await copyDownloadLink(filename);
+          showToast("Abriendo Atajos con nombre: " + filename);
           window.location.href = buildShortcutUrl(url);
         }
 
         async function downloadToFiles(anchor) {
           lockDownloadAnchor(anchor);
           const url = getStoredDownloadUrl(anchor);
-          const filename = anchor.getAttribute("download") || "video";
+          const filename = anchor.dataset.downloadFilename || getEpisodeFilename(anchor);
           if (!url) return;
 
           if (isAppleMobile()) {
