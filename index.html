@@ -186,6 +186,7 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
         document.addEventListener("DOMContentLoaded", function () {
           document.body.appendChild(toast);
           document.body.appendChild(chooserOverlay);
+          document.body.appendChild(playerOverlay);
           playerOverlay.style.display = "none";
           patchInlineVideos(document);
         });
@@ -467,14 +468,32 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
           playerOverlay.style.display = "none";
         }
 
-        function showInlinePlayer() {
-          return false;
+        function showInlinePlayer(card) {
+          const url = getEpisodeUrl(card);
+          if (!url) return false;
+          const video = playerOverlay.querySelector("#iphone-native-video");
+          const title = playerOverlay.querySelector("#iphone-player-title");
+          if (title) title.textContent = getEpisodeTitle(card);
+          if (!video) return false;
+          video.src = url;
+          video.preload = "metadata";
+          playerOverlay.style.display = "flex";
+          try {
+            const playPromise = video.play();
+            if (playPromise && typeof playPromise.catch === "function") {
+              playPromise.catch(function () {});
+            }
+          } catch {}
+          return true;
         }
 
         function openEpisode(card) {
           const anchor = card && card.querySelector('a[title="Descargar episodio"]');
           if (anchor) {
-            downloadToFiles(anchor);
+            saveEpisodeInteraction(anchor, "click");
+            if (!showInlinePlayer(card)) {
+              window.location.href = getStoredDownloadUrl(anchor);
+            }
           }
         }
 
@@ -678,7 +697,7 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
             card.setAttribute("aria-label", "Descargar " + getEpisodeTitle(card));
             card.addEventListener("click", function (event) {
               if (event.target.closest('a[title="Descargar episodio"]')) return;
-              if (event.target.closest("button")) return;
+              if (event.target.closest('button[title*="Marcar"]')) return;
               event.preventDefault();
               event.stopPropagation();
               if (event.stopImmediatePropagation) {
@@ -686,7 +705,7 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
               }
               activeCard = card;
               activeDownloadAnchor = card.querySelector('a[title="Descargar episodio"]');
-              showChooser(card);
+              openEpisode(card);
             }, true);
           });
         }
@@ -769,7 +788,7 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
             const text = (el.textContent || "").trim();
             if (text === "WWE Archive Viewer") el.textContent = "WWE Download Center";
             if (text === "TODO") el.textContent = "Inicio";
-            if (text === "Watch Now" || text === "Ver" || text === "Reproducir") el.textContent = "Descargar";
+            if (text === "Watch Now" || text === "Reproducir") el.textContent = "Ver";
           });
           hideShowTabs();
           renderLastEpisodePanel();
