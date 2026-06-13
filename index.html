@@ -643,10 +643,7 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
 
         function getDownloadAnchorFromEventTarget(target) {
           if (!target || !target.closest) return null;
-          const direct = target.closest('a[title="Descargar episodio"], a[data-download-url], a[href$=".mp4"], a[href*=".mp4?"], a[href*="archive.org"]');
-          if (direct) return direct;
-          const card = target.closest("div.cursor-pointer.group.overflow-hidden");
-          return card ? card.querySelector('a[title="Descargar episodio"], a[data-download-url]') : null;
+          return target.closest('a[title="Descargar episodio"], a[data-download-url], a[href$=".mp4"], a[href*=".mp4?"], a[href*="archive.org"]');
         }
 
         function strictDownloadClickGuard(event) {
@@ -686,15 +683,47 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
           });
         }
 
+        function patchCardPlayButton(card) {
+          const playLabel = Array.from(card.querySelectorAll("div span")).find(function (span) {
+            if (span.closest('a[title="Descargar episodio"], a[data-download-url]')) return false;
+            const text = (span.textContent || "").trim();
+            const parent = span.parentElement;
+            return /descargar|download|watch now|reproducir/i.test(text)
+              && parent
+              && parent.querySelector("svg")
+              && /text-yellow-400/.test(parent.className || "");
+          });
+          if (playLabel) playLabel.textContent = "Ver";
+
+          const buttons = Array.from(card.querySelectorAll("button"));
+          buttons.forEach(function (button) {
+            const title = button.getAttribute("title") || "";
+            if (/marcar/i.test(title)) return;
+            if (button.closest('a[title="Descargar episodio"], a[data-download-url]')) return;
+            const label = (button.textContent || "").trim();
+            if (!label || /sin ver/i.test(label)) return;
+            if (/descargar|download|watch now|reproducir/i.test(label)) {
+              const span = button.querySelector("span");
+              if (span) {
+                span.textContent = "Ver";
+              } else {
+                button.textContent = "Ver";
+              }
+              button.setAttribute("aria-label", "Ver " + getEpisodeTitle(card));
+            }
+          });
+        }
+
         function patchEpisodeCards(root) {
           const scope = root && root.querySelectorAll ? root : document;
           const cards = scope.querySelectorAll("div.cursor-pointer.group.overflow-hidden");
           cards.forEach(function (card) {
+            patchCardPlayButton(card);
             if (card.dataset.iosCardPatched === "1") return;
             if (!card.querySelector('a[title="Descargar episodio"]')) return;
             card.dataset.iosCardPatched = "1";
             card.setAttribute("role", "button");
-            card.setAttribute("aria-label", "Descargar " + getEpisodeTitle(card));
+            card.setAttribute("aria-label", "Ver " + getEpisodeTitle(card));
             card.addEventListener("click", function (event) {
               if (event.target.closest('a[title="Descargar episodio"]')) return;
               if (event.target.closest('button[title*="Marcar"]')) return;
