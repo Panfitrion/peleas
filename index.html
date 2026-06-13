@@ -177,7 +177,7 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
           '<div id="iphone-player-title" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff;font:700 14px/1.25 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif"></div>',
           '<button type="button" data-action="close-player" style="appearance:none;border:1px solid rgba(255,255,255,.18);border-radius:999px;background:rgba(255,255,255,.1);color:#fff;padding:10px 14px;font:700 14px/1 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">Cerrar</button>',
           '</div>',
-          '<video id="iphone-native-video" controls playsinline webkit-playsinline preload="metadata" controlslist="nodownload" style="width:100%;max-height:82vh;background:#000;border-radius:12px;outline:none"></video>'
+          '<video id="iphone-native-video" controls playsinline webkit-playsinline preload="metadata" controlslist="nodownload" style="display:block;width:100%;height:auto;max-height:82vh;background:#000;border-radius:12px;outline:none;object-fit:contain"></video>'
         ].join("");
         let activeCard = null;
         let activeDownloadAnchor = null;
@@ -448,6 +448,7 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
             ? [scope]
             : Array.from(scope.querySelectorAll("video"));
           videos.forEach(function (video) {
+            if (video.id === "iphone-native-video" || video.closest("#iphone-inline-player")) return;
             video.pause();
             video.removeAttribute("src");
             video.removeAttribute("poster");
@@ -476,6 +477,8 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
           if (title) title.textContent = getEpisodeTitle(card);
           if (!video) return false;
           video.src = url;
+          video.controls = true;
+          video.style.display = "block";
           video.preload = "metadata";
           playerOverlay.style.display = "flex";
           try {
