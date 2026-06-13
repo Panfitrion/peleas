@@ -101,11 +101,13 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
           '<div style="width:min(100%,420px);background:#0f172a;color:#fff;border:1px solid rgba(148,163,184,.18);border-radius:18px;padding:18px 16px 14px;box-shadow:0 24px 64px rgba(0,0,0,.45)">',
           '<div id="iphone-episode-title" style="font:700 16px/1.35 -apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;margin:0 0 14px;word-break:break-word"></div>',
           '<div style="display:grid;grid-template-columns:1fr;gap:10px">',
-          '<button type="button" data-action="download" style="appearance:none;border:none;border-radius:14px;padding:15px 12px;background:#22c55e;color:#052e16;font:800 15px/1.2 -apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">Descargar episodio</button>',
+          '<button type="button" data-action="download" style="appearance:none;border:none;border-radius:14px;padding:15px 12px;background:#22c55e;color:#052e16;font:800 15px/1.2 -apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">Descargar con Atajo</button>',
+          '<button type="button" data-action="copy" style="appearance:none;border:1px solid rgba(148,163,184,.32);border-radius:14px;padding:14px 12px;background:rgba(15,23,42,.72);color:#e2e8f0;font:750 14px/1.2 -apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">Copiar enlace</button>',
           '</div>',
           '<button type="button" data-action="cancel" style="appearance:none;border:none;background:transparent;color:#94a3b8;font:600 14px/1.2 -apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;width:100%;padding:14px 10px 2px;margin-top:6px">Cancelar</button>',
           '</div>'
         ].join("");
+        const IOS_SHORTCUT_NAME = "Guardar Video Archive";
         const playerOverlay = document.createElement("div");
         playerOverlay.setAttribute("id", "iphone-inline-player");
         playerOverlay.style.cssText = [
@@ -286,11 +288,32 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
           }
         }
 
+        function buildShortcutUrl(url) {
+          return "shortcuts://run-shortcut?name="
+            + encodeURIComponent(IOS_SHORTCUT_NAME)
+            + "&input=text&text="
+            + encodeURIComponent(url);
+        }
+
+        async function openIosShortcutDownload(anchor) {
+          lockDownloadAnchor(anchor);
+          const url = getStoredDownloadUrl(anchor);
+          if (!url) return;
+          await copyDownloadLink(url);
+          showToast("Abriendo Atajos. Usa el atajo: " + IOS_SHORTCUT_NAME + ".");
+          window.location.href = buildShortcutUrl(url);
+        }
+
         async function downloadToFiles(anchor) {
           lockDownloadAnchor(anchor);
           const url = getStoredDownloadUrl(anchor);
           const filename = anchor.getAttribute("download") || "video";
           if (!url) return;
+
+          if (isAppleMobile()) {
+            await openIosShortcutDownload(anchor);
+            return;
+          }
 
           setButtonState(anchor, "Preparando...", true);
 
@@ -315,12 +338,12 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
               showToast("Se abrio Compartir para guardarlo en Archivos.");
             } else {
               await copyDownloadLink(url);
-              showToast("Enlace copiado. Pegalo en Safari y usa Compartir > Guardar en Archivos.");
+              showToast("Enlace copiado. En este navegador la descarga directa fue bloqueada.");
             }
           } catch (error) {
-            console.error("No se pudo forzar la descarga en iPhone:", error);
+            console.error("No se pudo descargar el archivo:", error);
             await copyDownloadLink(url);
-            showToast("No se abrio el video. Copie el enlace para guardarlo desde Archivos/Safari.");
+            showToast("Descarga bloqueada por el navegador. Enlace copiado.");
           } finally {
             setButtonState(anchor, "Descargar", false);
           }
@@ -431,6 +454,15 @@ function v1(o){let g;return g=o.match(/(\w{3,9})\.?\s+(\d{1,2}),\s*(\d{4})/),g&&
           if (!action) return;
           if (action === "cancel") {
             hideChooser();
+            return;
+          }
+          if (action === "copy") {
+            const anchor = activeDownloadAnchor;
+            hideChooser();
+            if (anchor) {
+              copyDownloadLink(getStoredDownloadUrl(anchor));
+              showToast("Enlace copiado.");
+            }
             return;
           }
           if (action === "download") {
